@@ -5,8 +5,7 @@ from datetime import datetime, timedelta
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="My AI Helper Baby", page_icon="🔔", layout="centered")
 
-# --- SOUND JAVASCRIPT (The Magic Alarm) ---
-# Ye code background mein sound play karega
+# --- SOUND JAVASCRIPT ---
 sound_code = """
 <audio id="alarm_audio" style="display:none">
   <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
@@ -18,10 +17,9 @@ sound_code = """
   }
 </script>
 """
-
 st.markdown(sound_code, unsafe_allow_html=True)
 
-# --- APP STYLING ---
+# --- STYLING ---
 st.markdown("""
     <style>
     .stApp {background-color: #f0f2f6;}
@@ -33,44 +31,48 @@ st.markdown("""
 if 'tasks' not in st.session_state:
     st.session_state.tasks = []
 
+# --- HELPER: GET INDIA TIME ---
+def get_india_time():
+    # Server time (UTC) mein 5:30 hours jod rahe hain
+    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+
 # --- MAIN FUNCTIONS ---
 def add_task(text):
-    # Simple logic to convert "in 5 sec" to time
     due_time = None
     target_time_str = "No timer"
+    
+    # India time lo
+    now_india = get_india_time()
     
     if "sec" in text:
         try:
             sec = int([s for s in text.split() if s.isdigit()][0])
-            due_time = datetime.now() + timedelta(seconds=sec)
-            target_time_str = due_time.strftime("%H:%M:%S")
+            due_time = now_india + timedelta(seconds=sec)
+            target_time_str = due_time.strftime("%I:%M:%S %p") # AM/PM format
         except: pass
     elif "min" in text:
         try:
             mins = int([s for s in text.split() if s.isdigit()][0])
-            due_time = datetime.now() + timedelta(minutes=mins)
-            target_time_str = due_time.strftime("%H:%M:%S")
+            due_time = now_india + timedelta(minutes=mins)
+            target_time_str = due_time.strftime("%I:%M:%S %p")
         except: pass
 
     st.session_state.tasks.append({
         "title": text,
         "due_time": due_time,
         "display_time": target_time_str,
-        "played": False,  # To check if alarm already played
+        "played": False,
         "status": "Pending"
     })
 
-# --- TITLE & VOICE INSTRUCTION ---
-st.title("🔔 My AI Helper Baby")
-
-# --- VOICE INPUT TIP ---
-st.info("🎙️ **Voice Tip:** Type karne ki jagah, apne Mobile Keyboard ka **Mic Icon** 🎤 dabao aur bolo!")
+# --- UI TITLE ---
+st.title("🔔 My AI Helper (India)")
 
 # --- INPUT AREA ---
 with st.form("task_form", clear_on_submit=True):
     col1, col2 = st.columns([3, 1])
     with col1:
-        task_input = st.text_input("Task bolo ya likho...", placeholder="E.g. Remind me in 10 sec")
+        task_input = st.text_input("Task likho...", placeholder="E.g. Remind me in 10 sec")
     with col2:
         submitted = st.form_submit_button("Add Task ➕")
         
@@ -81,23 +83,21 @@ with st.form("task_form", clear_on_submit=True):
 
 st.divider()
 
-# --- LIVE TIMER CHECK & ALARM ---
-# Ye loop check karega ki time hua ya nahi
-now = datetime.now()
+# --- ALARM CHECKER (India Time) ---
+now_india = get_india_time()
 trigger_alarm = False
 
 if st.session_state.tasks:
     for task in st.session_state.tasks:
         if task['status'] == 'Pending' and task['due_time']:
-            # Agar time ho gaya aur abhi tak alarm nahi baja
-            if now >= task['due_time'] and not task['played']:
+            # Agar India time match ho gaya
+            if now_india >= task['due_time'] and not task['played']:
                 trigger_alarm = True
-                task['played'] = True  # Mark as played so it doesn't loop forever
+                task['played'] = True
                 st.toast(f"⏰ ALARM: {task['title']}!", icon="🔔")
 
-# --- PLAY SOUND IF TRIGGERED ---
+# --- PLAY SOUND ---
 if trigger_alarm:
-    # Ye JavaScript ko bolega ki Sound play karo
     st.components.v1.html(
         """<script>
         var audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -109,17 +109,17 @@ if trigger_alarm:
 # --- TASK LIST ---
 st.subheader("📝 Your Tasks")
 for i, task in enumerate(st.session_state.tasks):
-    col_a, col_b, col_c = st.columns([0.7, 0.2, 0.1])
+    col_a, col_b, col_c = st.columns([0.6, 0.3, 0.1])
     with col_a:
         st.markdown(f"**{task['title']}**")
     with col_b:
+        # Time ab AM/PM mein dikhega
         st.caption(f"⏰ {task['display_time']}")
     with col_c:
         if st.button("❌", key=f"del_{i}"):
             st.session_state.tasks.pop(i)
             st.rerun()
 
-# --- AUTO REFRESH (To keep checking time) ---
-# Ye page ko har 2 second mein refresh karega taaki alarm baj sake
+# --- AUTO REFRESH ---
 time.sleep(2)
 st.rerun()
